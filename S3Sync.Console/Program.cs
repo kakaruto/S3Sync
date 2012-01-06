@@ -21,19 +21,31 @@ namespace S3Sync.Console
             ListBucketsResponse listBucketsResponse = _amazonS3Client.ListBuckets();
             bool bucketIsExist = listBucketsResponse.Buckets.Any(s3Bucket => s3Bucket.BucketName == BucketName);
 
-            if (!bucketIsExist)
+            if ( !bucketIsExist )
             {
                 _amazonS3Client.PutBucket(new PutBucketRequest().WithBucketName(BucketName));
             }
         }
 
-        private static void Main(string[] args)
+        private static void GetFilesOnS3()
+        {
+            ListObjectsResponse listObjectsResponse = _amazonS3Client.ListObjects(new ListObjectsRequest {BucketName = BucketName});
+            foreach (S3Object s3Object in listObjectsResponse.S3Objects)
+            {
+                System.Console.WriteLine(s3Object.Key);
+            }
+        }
+
+        private static void Main()
         {
             InitializeS3Client();
+            GetFilesOnS3();
 
             while (System.Console.Read() != 'q')
             {
             }
+
+            _amazonS3Client.Dispose();
         }
     }
 }
