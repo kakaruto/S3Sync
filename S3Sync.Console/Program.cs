@@ -39,22 +39,22 @@ namespace S3Sync.Console
             foreach (S3Object s3Object in listObjectsResponse.S3Objects)
             {
                 FileInfo fileInfo = new FileInfo(Path.Combine(_folder, s3Object.Key));
-                if (fileInfo.Exists)
+                if ( fileInfo.Exists )
                 {
                     System.Console.WriteLine(s3Object.Key + " exist");
 
                     int dateCompare = DateTime.Compare(fileInfo.LastWriteTime, DateTime.Parse(s3Object.LastModified));
 
-                    if (dateCompare == 0)
+                    if ( dateCompare == 0 )
                     {
                         System.Console.WriteLine("No difference, do nothing");
                     }
-                    else if (dateCompare < 0)
+                    else if ( dateCompare < 0 )
                     {
                         System.Console.WriteLine("S3 is newer");
                         DownloadFile(s3Object);
                     }
-                    else if (dateCompare > 0)
+                    else if ( dateCompare > 0 )
                     {
                         System.Console.WriteLine("FS is newer");
                         UploadFile(fileInfo);
@@ -66,6 +66,16 @@ namespace S3Sync.Console
                     DownloadFile(s3Object);
                 }
             }
+        }
+
+        private static void DeleteS3Object(string key)
+        {
+            DeleteObjectRequest deleteRequest = new DeleteObjectRequest
+                                                    {
+                                                        BucketName = BucketName,
+                                                        Key = key
+                                                    };
+            _amazonS3Client.DeleteObject(deleteRequest);
         }
 
         private static void UploadFile(FileInfo fileInfo)
@@ -81,11 +91,11 @@ namespace S3Sync.Console
         private static void DownloadFile(S3Object s3Object)
         {
             System.Console.WriteLine("Downloading " + s3Object.Key);
-            GetObjectResponse getObjectResponse = _amazonS3Client.GetObject(new GetObjectRequest { BucketName = BucketName, Key = s3Object .Key});
+            GetObjectResponse getObjectResponse = _amazonS3Client.GetObject(new GetObjectRequest {BucketName = BucketName, Key = s3Object.Key});
 
             string filePath = Path.Combine(_folder, s3Object.Key);
-            using(FileStream fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
-            using(BufferedStream bufferedStream = new BufferedStream(getObjectResponse.ResponseStream))
+            using (FileStream fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+            using (BufferedStream bufferedStream = new BufferedStream(getObjectResponse.ResponseStream))
             {
                 byte[] buffer = new byte[0x2000];
                 int count;
