@@ -3,5 +3,6 @@
   <appSettings>
     <add key="WSAccessKey" value="put_your_AWS_access_key_here"/>
     <add key="AWSSecretKey" value="put_your_AWS_secret_key _here"/>
+    <add key="SyncFolder" value="put_your_folder_here"/>
   </appSettings>
 </configuration>
