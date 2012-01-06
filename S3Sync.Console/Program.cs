@@ -57,6 +57,7 @@ namespace S3Sync.Console
                     else if (dateCompare > 0)
                     {
                         System.Console.WriteLine("FS is newer");
+                        UploadFile(fileInfo);
                     }
                 }
                 else
@@ -65,6 +66,16 @@ namespace S3Sync.Console
                     DownloadFile(s3Object);
                 }
             }
+        }
+
+        private static void UploadFile(FileInfo fileInfo)
+        {
+            PutObjectRequest createRequest = new PutObjectRequest();
+            createRequest.WithBucketName(BucketName);
+            createRequest.WithKey(fileInfo.Name);
+            createRequest.WithFilePath(fileInfo.FullName);
+
+            _amazonS3Client.PutObject(createRequest);
         }
 
         private static void DownloadFile(S3Object s3Object)
