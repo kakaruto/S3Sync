@@ -25,5 +25,7 @@ obj/
 [Rr]elease*/
 _ReSharper*/
 [Tt]est[Rr]esult*
-Packages/
+packages/
 *.dotCover
+App.config
+!NuGet.exe

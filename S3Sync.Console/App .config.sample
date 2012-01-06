@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+  <appSettings>
+    <add key="WSAccessKey" value="put_your_AWS_access_key_here"/>
+    <add key="AWSSecretKey" value="put_your_AWS_secret_key _here"/>
+  </appSettings>
+</configuration>
