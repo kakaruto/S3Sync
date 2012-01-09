@@ -33,8 +33,8 @@ namespace S3Sync.Console
 
             Rijndael rijndael = Rijndael.Create();
            
-            byte[] key = rfcDb.GetBytes(16);
-            byte[] iv = rfcDb.GetBytes(16);
+            byte[] key = rfcDb.GetBytes(32); //256 bits key
+            byte[] iv = rfcDb.GetBytes(16); // 128 bits key
             _aesEncryptor = rijndael.CreateEncryptor(key, iv);
             _aesDecryptor = rijndael.CreateDecryptor(key, iv);
 
@@ -107,30 +107,24 @@ namespace S3Sync.Console
 
         private static void UploadFile(FileInfo fileInfo)
         {
-            //PutObjectRequest createRequest = new PutObjectRequest();
-            //createRequest.WithBucketName(BucketName);
-            //createRequest.WithKey(fileInfo.Name);
-            //createRequest.WithFilePath(fileInfo.FullName);
-
-            //_amazonS3Client.PutObject(createRequest);
-
-            using (FileStream inputFileStream = new FileStream(fileInfo.FullName, FileMode.Open, FileAccess.Read))
+            System.Console.WriteLine("Uploading " + fileInfo.Name);
+            using (FileStream inputFileStream = new FileStream(fileInfo.FullName, FileMode.Open))
+            using (MemoryStream outputMemoryStream = new MemoryStream())
+            using (CryptoStream cryptoStream = new CryptoStream(outputMemoryStream, _aesEncryptor, CryptoStreamMode.Write))
             {
-                byte[] inputFileData = new byte[(int)inputFileStream.Length];
-
-                using (MemoryStream outputStream = new MemoryStream())
-                using (CryptoStream encryptStream = new CryptoStream(outputStream, _aesEncryptor, CryptoStreamMode.Write))
+                int data;
+                while ((data = inputFileStream.ReadByte()) != -1)
                 {
-                    encryptStream.Write(inputFileData, 0, (int)inputFileStream.Length);
-                    encryptStream.FlushFinalBlock();
-
-                    PutObjectRequest createRequest = new PutObjectRequest();
-                    createRequest.WithBucketName(BucketName);
-                    createRequest.WithKey(fileInfo.Name);
-                    createRequest.WithInputStream(outputStream);
-
-                    _amazonS3Client.PutObject(createRequest);
+                    cryptoStream.WriteByte((byte)data);
                 }
+                cryptoStream.FlushFinalBlock();
+
+                PutObjectRequest createRequest = new PutObjectRequest();
+                createRequest.WithBucketName(BucketName);
+                createRequest.WithKey(fileInfo.Name);
+                createRequest.WithInputStream(outputMemoryStream);
+
+                _amazonS3Client.PutObject(createRequest);
             }
         }
 
@@ -140,49 +134,27 @@ namespace S3Sync.Console
             GetObjectResponse getObjectResponse = _amazonS3Client.GetObject(new GetObjectRequest { BucketName = BucketName, Key = s3Object.Key });
 
             string filePath = Path.Combine(_folder, s3Object.Key);
-            using (FileStream fileStream = new FileStream(filePath, FileMode.Create, FileAccess.ReadWrite))
-            using (BufferedStream bufferedStream = new BufferedStream(getObjectResponse.ResponseStream))
-            using (CryptoStream cryptoStream = new CryptoStream(fileStream, _aesDecryptor, CryptoStreamMode.Write))
-            {
-                byte[] buffer = new byte[0x2000];
-                int bytesRead;
-                do
-                {
-                    // read a chunck of data from the input file
-                    bytesRead = bufferedStream.Read(buffer, 0, buffer.Length);
 
-                    //decrypt it
-                    cryptoStream.Write(buffer, 0, bytesRead);
-                } while (bytesRead != 0);
-                //cryptoStream.FlushFinalBlock();
+            using (BufferedStream inputBufferedStream = new BufferedStream(getObjectResponse.ResponseStream))
+            using (CryptoStream cryptoStream = new CryptoStream(inputBufferedStream, _aesDecryptor, CryptoStreamMode.Read))
+            using (FileStream outputFileStream = new FileStream(filePath, FileMode.Create, FileAccess.ReadWrite))
+            {
+                int data;
+                while ((data = cryptoStream.ReadByte()) != -1)
+                {
+                    outputFileStream.WriteByte((byte)data);
+                }
             }
 
             new FileInfo(filePath).LastWriteTime = DateTime.Parse(s3Object.LastModified);
         }
 
-        private static byte[] Transform(byte[] bytes, ICryptoTransform selectCryptoTransform)
-        {
-            using (MemoryStream memoryStream = new MemoryStream())
-            {
-                using (CryptoStream cryptoStream = new CryptoStream(memoryStream, selectCryptoTransform, CryptoStreamMode.Write))
-                {
-                    cryptoStream.Write(bytes, 0, bytes.Length);
-                }
-                return memoryStream.ToArray();
-            }
-        }
-
         private static void Main()
         {
             Initialize();
-            //GetFilesOnS3();
+            GetFilesOnS3();
 
-            //byte[] encryptedBytes = Transform(System.Text.Encoding.UTF8.GetBytes("Hello World!"), _aesEncryptor);
-            byte[] buffer = File.ReadAllBytes(@"C:\Users\Philippe\Downloads\Test (2).txt");
-            var decryptedBytes = Transform(buffer, _aesDecryptor);
-
-            System.Console.WriteLine(System.Text.Encoding.UTF8.GetString(decryptedBytes));
-
+            System.Console.WriteLine("Waiting... (q to exit)");
             while (System.Console.Read() != 'q')
             {
             }
