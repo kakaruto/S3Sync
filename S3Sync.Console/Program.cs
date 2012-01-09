@@ -32,7 +32,7 @@ namespace S3Sync.Console
             Rfc2898DeriveBytes rfcDb = new Rfc2898DeriveBytes(password, System.Text.Encoding.UTF8.GetBytes(password));
 
             Rijndael rijndael = Rijndael.Create();
-           
+
             byte[] key = rfcDb.GetBytes(32); //256 bits key
             byte[] iv = rfcDb.GetBytes(16); // 128 bits key
             _aesEncryptor = rijndael.CreateEncryptor(key, iv);
@@ -46,6 +46,53 @@ namespace S3Sync.Console
                 _amazonS3Client.PutBucket(new PutBucketRequest().WithBucketName(BucketName));
             }
 
+            InitializeFileSystemWatcher();
+        }
+
+        private static void InitializeFileSystemWatcher()
+        {
+            FileSystemWatcher fileSystemWatcher = new FileSystemWatcher(_folder)
+                                                      {
+                                                          IncludeSubdirectories = false,
+                                                          NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size
+                                                      };
+
+            fileSystemWatcher.Created += fileSystemWatcher_Changed;
+            fileSystemWatcher.Changed += fileSystemWatcher_Changed;
+            fileSystemWatcher.Deleted += fileSystemWatcher_Changed;
+            fileSystemWatcher.Renamed += fileSystemWatcher_Renamed;
+
+            // Begin watch
+            fileSystemWatcher.EnableRaisingEvents = true;
+        }
+
+        private static void fileSystemWatcher_Renamed(object sender, RenamedEventArgs e)
+        {
+            System.Console.WriteLine("Rename of " + e.OldName + " in " + e.Name);
+            RenameS3Object(e.OldName, e.Name);
+        }
+
+        private static void fileSystemWatcher_Changed(object sender, FileSystemEventArgs e)
+        {
+            switch (e.ChangeType)
+            {
+                case WatcherChangeTypes.Created:
+                    System.Console.WriteLine("Creation of " + e.Name);
+                    UploadFile(new FileInfo(e.FullPath));
+                    break;
+                case WatcherChangeTypes.Changed:
+                    System.Console.WriteLine("Change of " + e.Name);
+                    UploadFile(new FileInfo(e.FullPath));
+                    break;
+                case WatcherChangeTypes.Deleted:
+                    System.Console.WriteLine("Deletion of " + e.Name);
+                    DeleteS3Object(e.Name);
+                    break;
+
+                default:
+                    System.Console.WriteLine("Bug " + e.Name);
+                    break;
+            }
         }
 
         private static void GetFilesOnS3()
@@ -105,6 +152,22 @@ namespace S3Sync.Console
             _amazonS3Client.DeleteObject(deleteRequest);
         }
 
+        private static void RenameS3Object(string oldKey, string newKey)
+        {
+            // Copy
+            CopyObjectRequest request = new CopyObjectRequest
+            {
+                SourceBucket = BucketName,
+                SourceKey = oldKey,
+                DestinationBucket = BucketName,
+                DestinationKey = newKey
+            };
+            _amazonS3Client.CopyObject(request);
+
+            // Delete
+            DeleteS3Object(oldKey);
+        }
+
         private static void UploadFile(FileInfo fileInfo)
         {
             System.Console.WriteLine("Uploading " + fileInfo.Name);
@@ -152,7 +215,7 @@ namespace S3Sync.Console
         private static void Main()
         {
             Initialize();
-            GetFilesOnS3();
+            //GetFilesOnS3();
 
             System.Console.WriteLine("Waiting... (q to exit)");
             while (System.Console.Read() != 'q')
