@@ -4,6 +4,7 @@ using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Threading;
 using Amazon.S3;
 using Amazon.S3.Model;
 
@@ -95,8 +96,9 @@ namespace S3Sync.Console
             }
         }
 
-        private static void GetFilesOnS3()
+        private static void GetFilesOnS3(object state)
         {
+            System.Console.WriteLine("Check Files on S3...");
             ListObjectsResponse listObjectsResponse = _amazonS3Client.ListObjects(new ListObjectsRequest { BucketName = BucketName });
             foreach (S3Object s3Object in listObjectsResponse.S3Objects)
             {
@@ -215,14 +217,20 @@ namespace S3Sync.Console
         private static void Main()
         {
             Initialize();
+
+            Timer timer = new Timer(GetFilesOnS3, null, 0, 60 * 1000);
+            
+            
             //GetFilesOnS3();
 
             System.Console.WriteLine("Waiting... (q to exit)");
             while (System.Console.Read() != 'q')
             {
+
             }
 
             _amazonS3Client.Dispose();
+            timer.Dispose();
         }
     }
 }
