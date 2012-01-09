@@ -100,6 +100,7 @@ namespace S3Sync.Console
         {
             System.Console.WriteLine("Check Files on S3...");
             ListObjectsResponse listObjectsResponse = _amazonS3Client.ListObjects(new ListObjectsRequest { BucketName = BucketName });
+            
             foreach (S3Object s3Object in listObjectsResponse.S3Objects)
             {
                 FileInfo fileInfo = new FileInfo(Path.Combine(_folder, s3Object.Key));
@@ -107,7 +108,12 @@ namespace S3Sync.Console
                 {
                     System.Console.WriteLine(s3Object.Key + " exist");
 
-                    int dateCompare = DateTime.Compare(fileInfo.LastWriteTime, DateTime.Parse(s3Object.LastModified));
+                    GetObjectMetadataRequest getObjectMetadataRequest = new GetObjectMetadataRequest();
+                    getObjectMetadataRequest.WithBucketName(BucketName).WithKey(s3Object.Key);
+                    GetObjectMetadataResponse getObjectMetadataResponse = _amazonS3Client.GetObjectMetadata(getObjectMetadataRequest);
+
+                    //int dateCompare = DateTime.Compare(fileInfo.LastWriteTime., DateTime.Parse(getObjectMetadataResponse.Metadata["x-amz-meta-LWT"]));
+                    int dateCompare = (int)(fileInfo.LastWriteTime - DateTime.Parse(getObjectMetadataResponse.Metadata["x-amz-meta-LWT"])).TotalSeconds;
 
                     if (dateCompare == 0)
                     {
@@ -185,6 +191,7 @@ namespace S3Sync.Console
                 cryptoStream.FlushFinalBlock();
 
                 PutObjectRequest createRequest = new PutObjectRequest();
+                createRequest.WithMetaData("x-amz-meta-LWT", fileInfo.LastWriteTime.ToString("G"));
                 createRequest.WithBucketName(BucketName);
                 createRequest.WithKey(fileInfo.Name);
                 createRequest.WithInputStream(outputMemoryStream);
@@ -197,7 +204,7 @@ namespace S3Sync.Console
         {
             System.Console.WriteLine("Downloading " + s3Object.Key);
             GetObjectResponse getObjectResponse = _amazonS3Client.GetObject(new GetObjectRequest { BucketName = BucketName, Key = s3Object.Key });
-
+            
             string filePath = Path.Combine(_folder, s3Object.Key);
 
             using (BufferedStream inputBufferedStream = new BufferedStream(getObjectResponse.ResponseStream))
@@ -211,7 +218,7 @@ namespace S3Sync.Console
                 }
             }
 
-            new FileInfo(filePath).LastWriteTime = DateTime.Parse(s3Object.LastModified);
+            new FileInfo(filePath).LastWriteTime = DateTime.Parse(getObjectResponse.Metadata["x-amz-meta-LWT"]);
         }
 
         private static void Main()
@@ -219,14 +226,10 @@ namespace S3Sync.Console
             Initialize();
 
             Timer timer = new Timer(GetFilesOnS3, null, 0, 60 * 1000);
-            
-            
-            //GetFilesOnS3();
 
             System.Console.WriteLine("Waiting... (q to exit)");
             while (System.Console.Read() != 'q')
             {
-
             }
 
             _amazonS3Client.Dispose();
