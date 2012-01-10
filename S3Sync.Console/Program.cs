@@ -55,11 +55,9 @@ namespace S3Sync.Console
             FileSystemWatcher fileSystemWatcher = new FileSystemWatcher(_folder)
                                                       {
                                                           IncludeSubdirectories = false,
-                                                          NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size
+                                                          NotifyFilter = NotifyFilters.FileName
                                                       };
 
-            fileSystemWatcher.Created += fileSystemWatcher_Changed;
-            fileSystemWatcher.Changed += fileSystemWatcher_Changed;
             fileSystemWatcher.Deleted += fileSystemWatcher_Changed;
             fileSystemWatcher.Renamed += fileSystemWatcher_Renamed;
 
